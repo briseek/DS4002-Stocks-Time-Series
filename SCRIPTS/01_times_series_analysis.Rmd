@@ -1,0 +1,298 @@
+---
+title: "S&P 500 Index Times Series Analysis"
+author: "Ashrita Kodali"
+date: "2025-03-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Summary of File:
+
+We will be using R to conduct the time series analysis. In this case, the tidyverse
+and dplyr packagtes will first be used to organize the initial dataset and obtain
+average monthly returns. Once the data is processed, the astsa package will be used to
+assess both the assumptions of the ARIMA and GARCH models by creating and assessing
+times series plots and ACF and PACF plots. We will then train both the ARIMA and GARCH
+models (using the astsa and fGarch packages respectively) and assess their respective
+model assumptions. Once the models are built, the performance of these models will be
+then assessed using metrics such as AIC, BIC, MAE, MSE, and RMSE. These values will then
+be formatted and organized using kableExtra (it is important to note that the file
+must be knitted into an HTML in order to view these figures properly). 
+
+# Data Preprocessing:
+```{r, message = FALSE, warning = FALSE}
+df <- read.csv("stock_data.csv", header = TRUE)
+
+# load in libraries
+library(tidyverse) # used for data cleaning
+library(dplyr) # used for data cleaning
+library(astsa) # used for ACF + PACF plots and ARIMA model building
+library(fGarch) # used for GARCH model building
+library(kableExtra) # used to organize and create tables
+
+# data cleaning
+df <- select(df, date, return)
+df <- drop_na(df)
+
+df$date <- as.Date(df$date, format = "%m/%d/%y")
+df$month <- as.numeric(format(df$date, format = "%m"))
+df$year <- as.numeric(format(df$date, format = "%Y"))
+
+data <- df %>% group_by(year, month) %>%
+  summarize(avg_return = mean(return))
+
+data <- as.data.frame(data)
+
+avg_returns <- data$avg_return
+
+returns <- ts(avg_returns, frequency = 12, start = c(2015, 1))
+
+# separating data into training and testing
+training <- returns[1:108]
+testing <- returns[109:122]
+```
+
+
+# Times Series Plots
+```{r}
+# times series plot of the averaged S&P 500 stock returns
+plot(training, type='l',
+     ylab="Averaged S&P Stock Returns", main="Times Series Plot of Averaged S&P Returns by Year",
+     xlab = "Year")
+points(training, pch=1, cex=0.6)
+
+log_returns <- log(training) # based on the graph, the variance was not stable
+# so we will take the log transformaton 
+log_returns <- ts(log_returns, frequency = 12, start = c(2015, 1)) # make sure the 
+# log returns are also a times series object
+
+plot(log_returns,type='l',
+     ylab="Log of S&P 500 Stock Returns", main="Times Series Plot of Log Returns by Year",
+     xlab = "Year")
+points(log_returns, pch=1,cex=0.6)
+# based on the graph, the variance is more stable, but the mean is not stable,
+# so I will difference the date
+```
+
+# Differencing:
+```{r}
+# apply differencing
+diff_1st_log_returns <- diff(log_returns) # first difference
+ds_log_returns <- diff(diff_1st_log_returns, 12) # this is seasonal difference
+diff_log_returns_seasonal <- diff(ds_log_returns) # first diff to seasonal diff
+
+# plots
+par(mfrow=c(3, 1))
+plot(diff_1st_log_returns, xlab='Year', ylab='First Difference', type='l',
+     main="Time Series Plot of Differenced S&P 500 Returns")
+points(diff_1st_log_returns,pch=1,cex=0.7)
+
+plot(ds_log_returns, xlab='Year', ylab='Seasonal Difference', type='l', 
+     main="Times Series Plot of Seasonal Differenced S&P 500 Returns")
+points(ds_log_returns, pch=1, cex=0.7)
+
+plot(diff_log_returns_seasonal, xlab='Year', ylab='Double Differenced', type='l',
+     main="Times Series Plot of Double Differenced (First and Seasonal) S&P 500 Returns")
+points(diff_log_returns_seasonal, pch=1, cex=0.7)
+
+par(mfrow=c(1, 1))
+plot(diff_log_returns_seasonal, type = "l",
+     ylab="Double Difference of Log S&P Returns",
+     main="Double Difference of Log S&P Returns by Year",
+     xlab = "Year")
+points(diff_log_returns_seasonal, pch=1,cex=0.7)
+# applying the log transformation, first difference, and seasonal difference makes the
+# data appear stationary, we now can proceed with ARIMA model building
+```
+
+# ACF + PACF Plots for ARIMA Model Building:
+```{r}
+astsa::acf2(diff_log_returns_seasonal, main = "ACF Plot")
+
+# looking at the acf, the acf is not significant at lag 1, so Q = 1 should be considered
+# The ACF is significant at lag 1, but not 2 3 4, so we should consider q = 1
+# the pacf is not significant at lags 12, 24, 36, etc so P = 1
+# the pacf is significant at lags 1, 2, 3, and lag 11 so for now we will consider
+# p = 1, 2, 3, because smaller values are better
+# no exponential decay in acf plot and pacf means that there is no arma model
+# d and D = 1 because we apploed differencing to both
+```
+
+# ARIMA Model Building
+```{r}
+diff_seasonal_log_model_1 <- sarima(log_returns, 1, 1, 0, 0, 1, 1, 12)
+```
+```{r}
+diff_seasonal_log_model_2 <- sarima(log_returns, 2, 1, 0, 0, 1, 1, 12)
+```
+```{r}
+diff_seasonal_log_model_3 <- sarima(log_returns, 3, 1, 0, 0, 1, 1, 12)
+```
+```{r}
+diff_seasonal_log_model_4 <- sarima(log_returns, 0, 1, 1, 0, 1, 1, 12)
+```
+
+```{r}
+par(mfrow=c(2,2))
+preds1 <- astsa::sarima.for(log_returns, 14, 1, 1, 0, 0, 1, 1, 12)
+preds2 <- astsa::sarima.for(log_returns, 14, 2, 1, 0, 0, 1, 1, 12)
+preds3 <- astsa::sarima.for(log_returns, 14, 3, 1, 0, 0, 1, 1, 12)
+preds4 <- astsa::sarima.for(log_returns, 14, 0, 1, 1, 0, 1, 1, 12)
+
+pred_test <- log(testing)
+```
+
+# ARIMA Model Performance
+```{r}
+# these values came from model output
+aic <- c(-3.467997, -3.472737, -3.455727, -3.473302)
+aicc <- c(-3.466624, -3.469961, -3.451049, -3.471929)
+bic <- c( -3.387348, -3.365205, -3.321313, -3.392653)
+
+# calculating the MAE
+mae1 <- mean(preds1$pred - pred_test)
+mae2 <- mean(preds2$pred - pred_test)
+mae3 <- mean(preds3$pred - pred_test)
+mae4 <- mean(preds4$pred - pred_test)
+
+mae <- c(mae1, mae2, mae3, mae4)
+
+# calculating MSE
+mse1 <- mean((preds1$pred - pred_test)^2)
+mse2 <- mean((preds2$pred - pred_test)^2)
+mse3 <- mean((preds3$pred - pred_test)^2)
+mse4 <- mean((preds4$pred - pred_test)^2)
+
+mse <- c(mse1, mse2, mse3, mse4)
+
+# calculating rmse
+rmse <- sqrt(mse)
+
+data_summary <- data.frame(rbind(aic, aicc, bic, mae, mse, rmse))
+
+# creating summary table of model performance for all of the seasonal ARIMA models
+
+rownames(data_summary) <- c("AIC", "AICc", "BIC", "MAE", "MSE", "RMSE")
+
+kable(data_summary, booktabs=TRUE, align = "c",
+      caption = "Summary of Seasonal ARIMA (p,d,q)x(P,D,Q) Models Performance",
+      col.names = c("(1, 1, 0)x(0, 1, 1)", "(2, 1, 0)x(0, 1, 1)",
+                    "(3, 1, 0)x(0, 1, 1)", "(0, 1, 1)x(0, 1, 1)")) %>%
+  kable_styling(latex_options=c("striped")) %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+# based on this, the 4th model does the best at minimizing the AIC, AICc, and BIC
+# and has MAE, MSE, and RMSE values that are closer to 0
+```
+
+
+# ACF + PACF plots + Hypothesis Testing for GARCH Model Building
+
+```{r}
+par(mfcol=c(1,2))
+acf(log_returns, lag=48, main="ACF of Log Returns") 
+acf(log_returns, lag=48, main="ACF of Abs Log Returns")
+# these plots will tell us if the data is independent or dependent, and correlated 
+# or uncorrelated
+
+# ideally, we would want the data to be dependent and uncorrelated, but minor lower order
+# serial correlations are okay
+
+# it looks like our data is correlated (based on acf of log returns) and dependent 
+# (based on acf of absolute value of log returns), but we will proceed anyways
+```
+
+
+```{r}
+t.test(log_returns) # since the test rejects the null hypothesis
+# and the confidence interval exludes 0, the test supports the
+# claim that the mean of this series is not 0
+
+res <- log_returns - mean(log_returns)
+
+Box.test(res^2, lag = 12, type = "Ljung") # this test is used to test whether
+# there are ARCH effects are present
+# since we have a significant box test, there are ARCH effects present
+
+astsa::acf2(res^2)
+# using the PACF, we will we see that lag 1 and lag 6 are significant
+```
+
+# GARCH Model Building
+```{r}
+result1 <- fGarch::garchFit(~1+garch(1,0), data = log_returns, trace = FALSE)
+summary(result1)
+
+# model does not meet assumptions as Ljung-Box test for residuals are significant
+```
+
+```{r}
+result2 <- fGarch::garchFit(~1+garch(6,0), data = log_returns, trace = FALSE)
+summary(result2)
+# model does not meet assumptions as Ljung-Box test for residuals are significant
+```
+
+
+```{r}
+result3 <- fGarch::garchFit(~1+garch(1,1), data = log_returns, trace = FALSE)
+summary(result3)
+# model does not meet assumptions as Ljung-Box test for residuals are significant
+```
+
+# GARCH Model Performance
+```{r}
+preds_garch1 <- fGarch::predict(result1, n.ahead=14)[,3]
+preds_garch2 <- fGarch::predict(result2, n.ahead=14)[,3]
+preds_garch3 <- fGarch::predict(result3, n.ahead=14)[,3]
+
+# these values are from the model output for GARCH models
+aic_garch <- c(-0.4895506, -0.4044202, -0.4710321)
+bic_garch <- c(-0.4150470, -0.2057438, -0.3716939)
+
+# calculating MAE
+mae1_garch <- mean(preds_garch1 - pred_test)
+mae2_garch <- mean(preds_garch2 - pred_test)
+mae3_garch <- mean(preds_garch2 - pred_test)
+
+mae_garch <- c(mae1_garch, mae2_garch, mae3_garch)
+
+# calculating MSE
+mse1_garch <- mean((preds_garch1 - pred_test)^2)
+mse2_garch <- mean((preds_garch2 - pred_test)^2)
+mse3_garch <- mean((preds_garch2 - pred_test)^2)
+
+mse_garch <- c(mse1_garch, mse2_garch, mse3_garch)
+
+# calculating RMSE
+rmse_garch <- sqrt(mse_garch)
+
+# summarizing performance metrics for GARCH models
+data_summary2 <- as.data.frame(rbind(aic_garch, bic_garch, mae_garch, mse_garch, 
+                                     rmse_garch))
+
+rownames(data_summary2) <- c("AIC", "BIC", "MAE", "MSE", "RMSE")
+
+kable(data_summary2, booktabs=TRUE, align = "c",
+      caption = "Summary of Seasonal GARCH (m,n) Models Performance",
+      col.names = c("(1,0)", "(6,0)","(1,1)")) %>%
+  kable_styling(latex_options=c("striped")) %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+```
+
+# Best Model
+```{r}
+# since none of the GARCH models meet the residual assumption, we cannot use
+# them to predict accurately (they also have bad performance metrics)
+# want the best arima model, which is a pure MA model with a pure MA
+# seasonal component 
+
+preds4 <- astsa::sarima.for(log_returns, 14, 0, 1, 1, 0, 1, 1, 12)
+pred_test <- log(testing)
+true_ts <- ts(pred_test, start = c(2024, 1), frequency=12)
+points(true_ts, col = "blue") 
+```
+
