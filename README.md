@@ -27,6 +27,7 @@ Developed and tested on Mac, but should work on Windows and Linux with appropria
  │   │   ├── PerformanceGraphExport.xls 
  ├──── 📂 FINAL/
  │   │   ├── stock_data.csv
+ │   │ YelpAnalysisDataAppendix.pdf
  │
  ├── 📂 scripts/  
  │   ├── 01_times_series_analysis.Rmd
