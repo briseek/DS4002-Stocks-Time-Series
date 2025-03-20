@@ -40,11 +40,11 @@ Developed and tested on Mac, but should work on Windows and Linux with appropria
 ## 3. Instructions for Reproducing Results
 
 ### Stage 1: Data Preparation and Sentiment Analysis in Python
-- Download the S&P 500 data set from the S&P 500 websites from January 30th, 2015 to February 21st, 2025
-- Extract the csv file and place them in your `data/` directory.
-- Open the csv file in Excel and remove both the header and footer that contains unnecessary information.
+- Download the S&P 500 data set from the [S&P 500 website] (https://www.spglobal.com/spdji/en/indices/equity/sp-500/#overview) for the following dates: From January 30th, 2015 to February 21st, 2025
+- Extract the xls file and place them in your `data/` directory.
+- Open the xls file in Excel and remove both the header and footer that contains unnecessary information.
 - Change the column names to date, return from Effective Date and S&P 500 respectively.
-- Save the file as stock_data and place it in your `data/` directory.
+- Save the file as a csv named stock_data and place it in your `data/` directory.
 - Open up RStudio to run `01_times_series_analysis.Rmd`
 - You may need to use the following commands in the R console to install the appropriate packages (if you don’t have them already):
   ```r
