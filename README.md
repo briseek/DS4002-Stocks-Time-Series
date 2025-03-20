@@ -60,7 +60,7 @@ Developed and tested on Mac, but should work on Windows and Linux with appropria
   - **Times Series Plots** (contains multiple times series plots to determine stationarity)
   - **Differencing** (contains times series plots of differenced data)
   - **ACF + PACF Plots for ARIMA Model Building** (contains the ACF and PACF plot of transformed data for ARIMA model building)
-  - ** ARIMA Model Performance** (contains the summarized model performance metrics of the ARIMA models)
+  - **ARIMA Model Performance** (contains the summarized model performance metrics of the ARIMA models)
   - **ACF + PACF plots + Hypothesis Testing for GARCH Model Building** (contains the ACF and PACF plot of log returns for GARCH model building)
-  - ** GARCH Model Performance** (contains the summarized model performance metrics of the GARCH models)
+  - **GARCH Model Performance** (contains the summarized model performance metrics of the GARCH models)
 - Annotate any figures using Google Slides
